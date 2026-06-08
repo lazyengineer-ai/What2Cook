@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { format } from "date-fns";
-import { AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import { AlertTriangle, Pencil, Trash2, TrendingDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UNITS, formatQuantity } from "@/lib/utils";
+import { SwipeableRow } from "@/components/ui/swipeable-row";
+import { UNITS, formatQuantity, cn } from "@/lib/utils";
+import { isExpiringSoon, isLowStock } from "@/lib/pantry-utils";
 import { UploadButton } from "@/lib/uploadthing";
 
 interface PantryItemData {
@@ -31,6 +33,7 @@ interface PantryItemData {
   unit: string;
   expiryDate: string | null;
   photoUrl: string | null;
+  lowStockThreshold?: number | null;
   ingredient: {
     id: string;
     name: string;
@@ -50,12 +53,14 @@ export function PantryItemCard({ item, onUpdate }: PantryItemCardProps) {
   const [expiryDate, setExpiryDate] = useState(
     item.expiryDate ? item.expiryDate.split("T")[0] : ""
   );
+  const [lowStockThreshold, setLowStockThreshold] = useState(
+    item.lowStockThreshold != null ? String(item.lowStockThreshold) : ""
+  );
   const [photoUrl, setPhotoUrl] = useState(item.photoUrl ?? "");
   const [saving, setSaving] = useState(false);
 
-  const isExpiring =
-    item.expiryDate &&
-    new Date(item.expiryDate) <= new Date(Date.now() + 3 * 86400000);
+  const expiring = isExpiringSoon(item.expiryDate);
+  const lowStock = isLowStock(item.quantity, item.lowStockThreshold);
 
   async function save() {
     setSaving(true);
@@ -67,6 +72,9 @@ export function PantryItemCard({ item, onUpdate }: PantryItemCardProps) {
         unit,
         expiryDate: expiryDate || null,
         photoUrl: photoUrl || null,
+        lowStockThreshold: lowStockThreshold
+          ? parseFloat(lowStockThreshold)
+          : null,
       }),
     });
     setSaving(false);
@@ -82,46 +90,62 @@ export function PantryItemCard({ item, onUpdate }: PantryItemCardProps) {
 
   return (
     <>
-      <Card>
-        <CardContent className="flex items-center gap-3 p-4">
-          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-            {item.photoUrl ? (
-              <Image src={item.photoUrl} alt="" fill className="object-cover" />
-            ) : (
-              <div className="flex h-full items-center justify-center text-xl">
-                {item.ingredient.category.icon}
-              </div>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <p className="font-medium">{item.ingredient.name}</p>
-              {isExpiring && (
-                <Badge variant="warning" className="gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  Expiring
-                </Badge>
+      <SwipeableRow
+        onDelete={remove}
+        deleteLabel={`Remove ${item.ingredient.name}`}
+      >
+        <Card
+          className={cn(
+            lowStock && "border-amber-500/50 bg-amber-500/5",
+            expiring && !lowStock && "border-orange-500/40"
+          )}
+        >
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+              {item.photoUrl ? (
+                <Image src={item.photoUrl} alt="" fill className="object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-xl">
+                  {item.ingredient.category.icon}
+                </div>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
-              {formatQuantity(item.quantity, item.unit)} · {item.ingredient.category.name}
-            </p>
-            {item.expiryDate && (
-              <p className="text-xs text-muted-foreground">
-                Expires {format(new Date(item.expiryDate), "MMM d, yyyy")}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium">{item.ingredient.name}</p>
+                {expiring && (
+                  <Badge variant="warning" className="gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Expiring
+                  </Badge>
+                )}
+                {lowStock && (
+                  <Badge variant="outline" className="gap-1 border-amber-500/50 text-amber-700 dark:text-amber-400">
+                    <TrendingDown className="h-3 w-3" />
+                    Low stock
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {formatQuantity(item.quantity, item.unit)} · {item.ingredient.category.name}
               </p>
-            )}
-          </div>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" onClick={() => setEditing(true)}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={remove}>
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              {item.expiryDate && (
+                <p className="text-xs text-muted-foreground">
+                  Expires {format(new Date(item.expiryDate), "MMM d, yyyy")}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" onClick={() => setEditing(true)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={remove}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </SwipeableRow>
 
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent>
@@ -155,6 +179,17 @@ export function PantryItemCard({ item, onUpdate }: PantryItemCardProps) {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Low stock alert below (optional)</Label>
+              <Input
+                type="number"
+                value={lowStockThreshold}
+                onChange={(e) => setLowStockThreshold(e.target.value)}
+                min="0"
+                step="any"
+                placeholder="e.g. 2"
+              />
             </div>
             <div className="space-y-2">
               <Label>Expiry date</Label>

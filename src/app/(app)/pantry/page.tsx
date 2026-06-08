@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { AppHeader } from "@/components/layout/app-header";
 import { IngredientSearch } from "@/components/pantry/ingredient-search";
+import { CategoryFilter } from "@/components/pantry/category-filter";
 import { PantryItemCard } from "@/components/pantry/pantry-item-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,10 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { UNITS } from "@/lib/utils";
+import { isExpiringSoon, isLowStock } from "@/lib/pantry-utils";
 
 interface PantryItem {
   id: string;
@@ -32,6 +33,7 @@ interface PantryItem {
   unit: string;
   expiryDate: string | null;
   photoUrl: string | null;
+  lowStockThreshold?: number | null;
   ingredient: {
     id: string;
     name: string;
@@ -60,12 +62,13 @@ export default function PantryPage() {
   const [unit, setUnit] = useState("pieces");
   const [expiryDate, setExpiryDate] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     const [pantryRes, catRes] = await Promise.all([
-      fetch("/api/pantry"),
-      fetch("/api/categories"),
+      fetch("/api/pantry", { credentials: "same-origin" }),
+      fetch("/api/categories", { credentials: "same-origin" }),
     ]);
     setItems(await pantryRes.json());
     setCategories(await catRes.json());
@@ -97,10 +100,45 @@ export default function PantryPage() {
     load();
   }
 
-  const filtered =
-    filterCategory === "all"
-      ? items
-      : items.filter((i) => i.ingredient.category.slug === filterCategory);
+  const expiringCount = useMemo(
+    () => items.filter((i) => isExpiringSoon(i.expiryDate)).length,
+    [items]
+  );
+
+  const lowStockCount = useMemo(
+    () => items.filter((i) => isLowStock(i.quantity, i.lowStockThreshold)).length,
+    [items]
+  );
+
+  const filtered = useMemo(() => {
+    let result = items;
+
+    if (filterCategory === "expiring") {
+      result = result.filter((i) => isExpiringSoon(i.expiryDate));
+    } else if (filterCategory === "low-stock") {
+      result = result.filter((i) => isLowStock(i.quantity, i.lowStockThreshold));
+    } else if (filterCategory !== "all") {
+      result = result.filter((i) => i.ingredient.category.slug === filterCategory);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter((i) =>
+        i.ingredient.name.toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [items, filterCategory, searchQuery]);
+
+  const categoryCounts = items.reduce(
+    (acc, item) => {
+      const slug = item.ingredient.category.slug;
+      acc[slug] = (acc[slug] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
 
   const grouped = filtered.reduce(
     (acc, item) => {
@@ -111,6 +149,24 @@ export default function PantryPage() {
     },
     {} as Record<string, PantryItem[]>
   );
+
+  const categoryOrder = new Map(categories.map((c, i) => [c.name, i]));
+  const sortedGroups = Object.entries(grouped).sort(
+    ([a], [b]) => (categoryOrder.get(a) ?? 99) - (categoryOrder.get(b) ?? 99)
+  );
+
+  const showGrouped =
+    filterCategory === "all" && !searchQuery.trim();
+
+  const emptyMessage = searchQuery.trim()
+    ? `No items matching "${searchQuery.trim()}"`
+    : filterCategory === "expiring"
+      ? "Nothing expiring soon — nice work!"
+      : filterCategory === "low-stock"
+        ? "No low stock items right now."
+        : filterCategory === "all"
+          ? "No items in pantry yet. Add your first ingredient!"
+          : `No ${categories.find((c) => c.slug === filterCategory)?.name ?? "items"} in your pantry.`;
 
   return (
     <>
@@ -187,30 +243,46 @@ export default function PantryPage() {
           </DialogContent>
         </Dialog>
 
-        <Tabs value={filterCategory} onValueChange={setFilterCategory}>
-          <TabsList className="h-auto flex-wrap">
-            <TabsTrigger value="all">All</TabsTrigger>
-            {categories.map((c) => (
-              <TabsTrigger key={c.id} value={c.slug}>
-                {c.icon}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <TabsContent value={filterCategory} className="mt-4">
-            {loading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-              </div>
-            ) : filtered.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No items in pantry yet. Add your first ingredient!
-              </p>
-            ) : filterCategory === "all" ? (
-              Object.entries(grouped).map(([category, catItems]) => (
-                <div key={category} className="mb-6">
-                  <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
-                    {category}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search pantry..."
+            className="pl-9"
+          />
+        </div>
+
+        <CategoryFilter
+          categories={categories}
+          value={filterCategory}
+          onChange={setFilterCategory}
+          counts={categoryCounts}
+          extraFilters={[
+            { slug: "expiring", emoji: "⚠️", label: "Expiring", count: expiringCount },
+            { slug: "low-stock", emoji: "📉", label: "Low", count: lowStockCount },
+          ]}
+        />
+
+        <div className="mt-2">
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {emptyMessage}
+            </p>
+          ) : showGrouped ? (
+            sortedGroups.map(([categoryName, catItems]) => {
+              const icon = catItems[0]?.ingredient.category.icon;
+              return (
+                <div key={categoryName} className="mb-6">
+                  <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+                    <span className="text-base">{icon}</span>
+                    {categoryName}
+                    <span className="text-xs font-normal">({catItems.length})</span>
                   </h3>
                   <div className="space-y-2">
                     {catItems.map((item) => (
@@ -218,16 +290,16 @@ export default function PantryPage() {
                     ))}
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="space-y-2">
-                {filtered.map((item) => (
-                  <PantryItemCard key={item.id} item={item} onUpdate={load} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              );
+            })
+          ) : (
+            <div className="space-y-2">
+              {filtered.map((item) => (
+                <PantryItemCard key={item.id} item={item} onUpdate={load} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </>
   );

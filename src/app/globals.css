@@ -73,4 +73,11 @@
   .touch-target {
     @apply min-h-[44px] min-w-[44px];
   }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }

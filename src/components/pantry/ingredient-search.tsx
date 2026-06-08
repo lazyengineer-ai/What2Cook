@@ -45,6 +45,7 @@ export function IngredientSearch({
 }: IngredientSearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Ingredient[]>([]);
+  const [searching, setSearching] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -53,9 +54,18 @@ export function IngredientSearch({
   const [creating, setCreating] = useState(false);
 
   const search = useCallback(async (q: string) => {
-    const res = await fetch(`/api/ingredients?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    setResults(data);
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/ingredients?q=${encodeURIComponent(q)}`, {
+        credentials: "same-origin",
+      });
+      const data = await res.json();
+      setResults(Array.isArray(data) ? data : []);
+    } catch {
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -65,10 +75,13 @@ export function IngredientSearch({
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (query.length >= 1) search(query);
-      else setResults([]);
-    }, 300);
+    if (query.length < 1) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const timer = setTimeout(() => search(query), 300);
     return () => clearTimeout(timer);
   }, [query, search]);
 
@@ -93,8 +106,10 @@ export function IngredientSearch({
     setResults([]);
   }
 
+  const showResults = query.length >= 1;
+
   return (
-    <div className="relative">
+    <div>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -105,96 +120,101 @@ export function IngredientSearch({
         />
       </div>
 
-      {results.length > 0 && query && (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover shadow-lg">
-          {results.map((ing) => (
-            <button
-              key={ing.id}
-              type="button"
-              className="flex w-full items-center gap-2 px-3 py-3 text-left text-sm hover:bg-accent touch-target"
-              onClick={() => {
-                onSelect(ing);
-                setQuery("");
-                setResults([]);
-              }}
-            >
-              <span>{ing.category.icon}</span>
-              <span className="font-medium">{ing.name}</span>
-              <span className="ml-auto text-xs text-muted-foreground">
-                {ing.category.name}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {query.length >= 1 && results.length === 0 && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover p-3 shadow-lg">
-          <p className="text-sm text-muted-foreground">No ingredients found</p>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2 w-full"
-                onClick={() => setNewName(query)}
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                Add &quot;{query}&quot; as new ingredient
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add custom ingredient</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={newCategoryId} onValueChange={setNewCategoryId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.icon} {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Default unit</Label>
-                  <Select value={newUnit} onValueChange={setNewUnit}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {UNITS.map((u) => (
-                        <SelectItem key={u} value={u}>
-                          {u}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  className="w-full"
-                  onClick={createIngredient}
-                  disabled={creating || !newName || !newCategoryId}
-                >
-                  {creating ? "Creating..." : "Create ingredient"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+      {showResults && (
+        <div className="mt-2 overflow-hidden rounded-md border bg-popover shadow-sm">
+          {searching ? (
+            <p className="px-3 py-3 text-sm text-muted-foreground">Searching...</p>
+          ) : results.length > 0 ? (
+            <ul className="max-h-48 divide-y overflow-y-auto">
+              {results.map((ing) => (
+                <li key={ing.id}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-3 text-left text-sm hover:bg-accent touch-target"
+                    onClick={() => {
+                      onSelect(ing);
+                      setQuery("");
+                      setResults([]);
+                    }}
+                  >
+                    <span>{ing.category.icon}</span>
+                    <span className="font-medium">{ing.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {ing.category.name}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="p-3">
+              <p className="text-sm text-muted-foreground">No ingredients found</p>
+              <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 w-full"
+                    onClick={() => setNewName(query)}
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add &quot;{query}&quot; as new ingredient
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add custom ingredient</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Name</Label>
+                      <Input
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Select value={newCategoryId} onValueChange={setNewCategoryId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.icon} {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Default unit</Label>
+                      <Select value={newUnit} onValueChange={setNewUnit}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNITS.map((u) => (
+                            <SelectItem key={u} value={u}>
+                              {u}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={createIngredient}
+                      disabled={creating || !newName || !newCategoryId}
+                    >
+                      {creating ? "Creating..." : "Create ingredient"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
         </div>
       )}
     </div>
