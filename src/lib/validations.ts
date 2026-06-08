@@ -63,6 +63,13 @@ export const mealPlanSchema = z.object({
   recipeId: z.string(),
 });
 
+export const groceryItemSchema = z.object({
+  weekStart: z.string(),
+  ingredientId: z.string(),
+  quantity: z.number().positive(),
+  unit: z.string(),
+});
+
 export const purchaseSchema = z.object({
   store: z.string().optional(),
   date: z.string(),

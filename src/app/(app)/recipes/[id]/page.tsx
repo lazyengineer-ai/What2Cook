@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, ChefHat, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Clock, ChefHat, Trash2, Pencil } from "lucide-react";
 import { scoreRecipe, type RecipeWithIngredients } from "@/lib/match-recipes";
 import { formatQuantity } from "@/lib/utils";
 
@@ -169,10 +170,18 @@ export default function RecipeDetailPage() {
           </p>
         )}
 
-        <Button variant="destructive" onClick={handleDelete}>
-          <Trash2 className="mr-2 h-4 w-4" />
-          Delete recipe
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" asChild>
+            <Link href={`/recipes/${id}/edit`}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit recipe
+            </Link>
+          </Button>
+          <Button variant="destructive" className="flex-1" onClick={handleDelete}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
+        </div>
       </div>
     </>
   );

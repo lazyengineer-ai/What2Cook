@@ -146,7 +146,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   const user = await requireUser();
   const body = await req.json();
-  const { itemId, checked } = body;
+  const { itemId, checked, quantity, unit } = body;
 
   const item = await prisma.groceryListItem.findFirst({
     where: { id: itemId },
@@ -157,9 +157,20 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  if ((quantity !== undefined || unit !== undefined) && item.source !== "MANUAL") {
+    return NextResponse.json(
+      { error: "Only manually added items can be edited" },
+      { status: 400 }
+    );
+  }
+
   const updated = await prisma.groceryListItem.update({
     where: { id: itemId },
-    data: { checked },
+    data: {
+      ...(checked !== undefined && { checked }),
+      ...(quantity !== undefined && { quantity }),
+      ...(unit !== undefined && { unit }),
+    },
     include: { ingredient: { include: { category: true } } },
   });
 

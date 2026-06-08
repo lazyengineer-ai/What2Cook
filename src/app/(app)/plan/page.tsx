@@ -15,8 +15,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, ShoppingCart, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShoppingCart, AlertCircle, Trash2 } from "lucide-react";
 import { DAY_NAMES, formatQuantity } from "@/lib/utils";
+import { AddGroceryItemDialog } from "@/components/plan/add-grocery-item-dialog";
+import { Badge } from "@/components/ui/badge";
 
 const MEAL_SLOTS = ["BREAKFAST", "LUNCH", "DINNER"] as const;
 const MEAL_LABELS: Record<string, string> = {
@@ -42,6 +44,7 @@ interface GroceryItem {
   quantity: number;
   unit: string;
   checked: boolean;
+  source: string;
   ingredient: {
     name: string;
     category: { name: string; icon: string | null; slug: string };
@@ -115,6 +118,11 @@ export default function PlanPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId, checked: !checked }),
     });
+    load();
+  }
+
+  async function deleteGroceryItem(itemId: string) {
+    await fetch(`/api/grocery/items/${itemId}`, { method: "DELETE" });
     load();
   }
 
@@ -237,9 +245,11 @@ export default function PlanPage() {
               {generating ? "Generating..." : "Generate from meal plan"}
             </Button>
 
+            <AddGroceryItemDialog weekStart={weekStartStr} onAdded={load} />
+
             {groceryItems.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                No grocery list yet. Plan your meals and generate a list.
+                No grocery list yet. Generate from your meal plan or add items manually.
               </p>
             ) : (
               Object.entries(groupedGrocery).map(([category, items]) => (
@@ -249,7 +259,7 @@ export default function PlanPage() {
                   </h3>
                   <div className="space-y-1">
                     {items.map((item) => (
-                      <label
+                      <div
                         key={item.id}
                         className="flex items-center gap-3 rounded-lg border p-3 touch-target"
                       >
@@ -259,15 +269,38 @@ export default function PlanPage() {
                             toggleGroceryItem(item.id, item.checked)
                           }
                         />
-                        <span
-                          className={`flex-1 ${item.checked ? "line-through text-muted-foreground" : ""}`}
-                        >
-                          {item.ingredient.name}
-                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={
+                                item.checked
+                                  ? "line-through text-muted-foreground"
+                                  : ""
+                              }
+                            >
+                              {item.ingredient.name}
+                            </span>
+                            {item.source === "MANUAL" && (
+                              <Badge variant="outline" className="text-xs">
+                                Manual
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
                         <span className="text-sm text-muted-foreground">
                           {formatQuantity(item.quantity, item.unit)}
                         </span>
-                      </label>
+                        {item.source === "MANUAL" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteGroceryItem(item.id)}
+                            aria-label="Remove item"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
