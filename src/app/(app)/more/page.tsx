@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Receipt, Settings, TrendingUp } from "lucide-react";
+import { HouseholdSettings } from "@/components/household/household-settings";
 import { DAY_NAMES, formatQuantity } from "@/lib/utils";
 import { DIETARY_RULE_LABELS } from "@/lib/dietary";
 import { UploadButton } from "@/lib/uploadthing";
@@ -147,6 +148,8 @@ export default function MorePage() {
           </TabsList>
 
           <TabsContent value="settings" className="space-y-6">
+            <HouseholdSettings />
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Appearance</CardTitle>

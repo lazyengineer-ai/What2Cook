@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth-utils";
 import { registerSchema } from "@/lib/validations";
+import { generateUniqueInviteCode, normalizeInviteCode } from "@/lib/household-code";
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { name, email, password, householdName } = parsed.data;
+    const { name, email, password } = parsed.data;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -24,19 +25,72 @@ export async function POST(req: Request) {
 
     const passwordHash = await hashPassword(password);
 
-    const user = await prisma.$transaction(async (tx) => {
-      const household = await tx.household.create({
-        data: { name: householdName },
+    if (parsed.data.mode === "join") {
+      const inviteCode = normalizeInviteCode(parsed.data.inviteCode);
+      const household = await prisma.household.findUnique({
+        where: { inviteCode },
       });
 
-      return tx.user.create({
+      if (!household) {
+        return NextResponse.json({ error: "Invalid join code" }, { status: 400 });
+      }
+
+      const user = await prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            name,
+            email,
+            passwordHash,
+            activeHouseholdId: household.id,
+          },
+        });
+
+        await tx.householdMember.create({
+          data: {
+            userId: created.id,
+            householdId: household.id,
+            role: "MEMBER",
+          },
+        });
+
+        return created;
+      });
+
+      return NextResponse.json({ id: user.id, email: user.email });
+    }
+
+    const inviteCode = await generateUniqueInviteCode(async (code) => {
+      const existingCode = await prisma.household.findUnique({
+        where: { inviteCode: code },
+      });
+      return !!existingCode;
+    });
+
+    const createData = parsed.data;
+
+    const user = await prisma.$transaction(async (tx) => {
+      const household = await tx.household.create({
+        data: { name: createData.householdName, inviteCode },
+      });
+
+      const created = await tx.user.create({
         data: {
           name,
           email,
           passwordHash,
-          householdId: household.id,
+          activeHouseholdId: household.id,
         },
       });
+
+      await tx.householdMember.create({
+        data: {
+          userId: created.id,
+          householdId: household.id,
+          role: "OWNER",
+        },
+      });
+
+      return created;
     });
 
     return NextResponse.json({ id: user.id, email: user.email });

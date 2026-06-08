@@ -4,6 +4,32 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth-utils";
 
+async function resolveLoginHouseholdId(userId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      activeHousehold: true,
+      memberships: { include: { household: true }, orderBy: { joinedAt: "asc" } },
+    },
+  });
+
+  if (!user || user.memberships.length === 0) return null;
+
+  if (
+    user.activeHouseholdId &&
+    user.memberships.some((m) => m.householdId === user.activeHouseholdId)
+  ) {
+    return user.activeHouseholdId;
+  }
+
+  const first = user.memberships[0];
+  await prisma.user.update({
+    where: { id: userId },
+    data: { activeHouseholdId: first.householdId },
+  });
+  return first.householdId;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   trustHost: true,
@@ -33,20 +59,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         );
         if (!valid) return null;
 
+        const householdId = await resolveLoginHouseholdId(user.id);
+        if (!householdId) return null;
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          householdId: user.householdId,
+          householdId,
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.householdId = (user as { householdId?: string }).householdId;
+      }
+      if (trigger === "update" && session?.householdId) {
+        token.householdId = session.householdId as string;
       }
       return token;
     },

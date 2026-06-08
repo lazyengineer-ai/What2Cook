@@ -1,10 +1,36 @@
 import { z } from "zod";
 
-export const registerSchema = z.object({
+const registerBaseSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+export const registerCreateSchema = registerBaseSchema.extend({
+  mode: z.literal("create"),
   householdName: z.string().min(1, "Household name is required"),
+});
+
+export const registerJoinSchema = registerBaseSchema.extend({
+  mode: z.literal("join"),
+  inviteCode: z.string().min(4, "Join code is required").max(10),
+});
+
+export const registerSchema = z.discriminatedUnion("mode", [
+  registerCreateSchema,
+  registerJoinSchema,
+]);
+
+export const joinHouseholdSchema = z.object({
+  inviteCode: z.string().min(4, "Join code is required").max(10),
+});
+
+export const switchHouseholdSchema = z.object({
+  householdId: z.string().min(1, "Household is required"),
+});
+
+export const createHouseholdSchema = z.object({
+  name: z.string().min(1, "Household name is required"),
 });
 
 export const loginSchema = z.object({
