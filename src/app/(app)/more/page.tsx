@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { AppHeader } from "@/components/layout/app-header";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,9 @@ interface Purchase {
 }
 
 export default function MorePage() {
+  const { data: session } = useSession();
+  const activeHouseholdId = session?.user?.householdId;
+
   const [constraints, setConstraints] = useState<Constraint[]>([]);
   const [forecasts, setForecasts] = useState<Forecast[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -87,10 +90,11 @@ export default function MorePage() {
   }, []);
 
   useEffect(() => {
+    if (!activeHouseholdId) return;
     loadConstraints();
     loadForecast();
     loadExpenses();
-  }, [loadConstraints, loadForecast, loadExpenses]);
+  }, [loadConstraints, loadForecast, loadExpenses, activeHouseholdId]);
 
   async function addConstraint() {
     await fetch("/api/constraints", {

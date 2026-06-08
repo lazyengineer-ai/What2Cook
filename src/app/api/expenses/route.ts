@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUserApi } from "@/lib/auth-utils";
+import { assertIngredientAccessible } from "@/lib/ingredient-access";
 import { prisma } from "@/lib/db";
 import { purchaseSchema } from "@/lib/validations";
 
@@ -48,6 +49,17 @@ export async function POST(req: Request) {
   }
 
   const { store, date, total, receiptUrl, notes, lineItems } = parsed.data;
+
+  if (lineItems?.length) {
+    for (const li of lineItems) {
+      if (
+        li.ingredientId &&
+        !(await assertIngredientAccessible(user.householdId, li.ingredientId))
+      ) {
+        return NextResponse.json({ error: "Ingredient not found" }, { status: 404 });
+      }
+    }
+  }
 
   const purchase = await prisma.purchaseRecord.create({
     data: {

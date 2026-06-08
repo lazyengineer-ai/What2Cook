@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUserApi } from "@/lib/auth-utils";
+import { assertIngredientAccessible } from "@/lib/ingredient-access";
 import { prisma } from "@/lib/db";
 import { pantryItemSchema } from "@/lib/validations";
 
@@ -34,6 +35,10 @@ export async function POST(req: Request) {
 
   const { ingredientId, quantity, unit, expiryDate, photoUrl, lowStockThreshold } =
     parsed.data;
+
+  if (!(await assertIngredientAccessible(user.householdId, ingredientId))) {
+    return NextResponse.json({ error: "Ingredient not found" }, { status: 404 });
+  }
 
   const item = await prisma.pantryItem.create({
     data: {

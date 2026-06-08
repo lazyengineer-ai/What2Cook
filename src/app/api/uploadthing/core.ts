@@ -1,14 +1,14 @@
 import { createUploadthing, type FileRouter } from "uploadthing/next";
-import { auth } from "@/auth";
+import { getSessionUser } from "@/lib/auth-utils";
 
 const f = createUploadthing();
 
 async function getAuthUser() {
-  const session = await auth();
-  if (!session?.user?.householdId) {
+  const user = await getSessionUser();
+  if (!user) {
     throw new Error("Unauthorized");
   }
-  return session.user;
+  return user;
 }
 
 export const ourFileRouter = {

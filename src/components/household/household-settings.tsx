@@ -48,11 +48,15 @@ export function HouseholdSettings() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/household");
     if (res.ok) {
+      setLoadFailed(false);
       setData(await res.json());
+    } else {
+      setLoadFailed(true);
     }
   }, []);
 
@@ -177,7 +181,9 @@ export function HouseholdSettings() {
           <CardTitle className="text-base">Household</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <p className="text-sm text-muted-foreground">
+            {loadFailed ? "Failed to load household settings." : "Loading..."}
+          </p>
         </CardContent>
       </Card>
     );

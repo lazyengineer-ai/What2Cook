@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUserApi } from "@/lib/auth-utils";
+import { assertIngredientAccessible } from "@/lib/ingredient-access";
 import { prisma } from "@/lib/db";
 import { recipeSchema } from "@/lib/validations";
 
@@ -50,6 +51,12 @@ export async function POST(req: Request) {
 
   const { title, instructions, prepTime, servings, photoUrl, tags, ingredients } =
     parsed.data;
+
+  for (const ing of ingredients) {
+    if (!(await assertIngredientAccessible(user.householdId, ing.ingredientId))) {
+      return NextResponse.json({ error: "Ingredient not found" }, { status: 404 });
+    }
+  }
 
   const recipe = await prisma.recipe.create({
     data: {

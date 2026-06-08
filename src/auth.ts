@@ -77,8 +77,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.householdId = (user as { householdId?: string }).householdId;
       }
-      if (trigger === "update" && session?.householdId) {
-        token.householdId = session.householdId as string;
+      if (trigger === "update" && session?.householdId && token.id) {
+        const membership = await prisma.householdMember.findUnique({
+          where: {
+            userId_householdId: {
+              userId: token.id as string,
+              householdId: session.householdId as string,
+            },
+          },
+        });
+        if (membership) {
+          token.householdId = session.householdId as string;
+        }
       }
       return token;
     },

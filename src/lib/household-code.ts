@@ -2,9 +2,11 @@ const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 6;
 
 export function generateInviteCode(): string {
+  const randomValues = new Uint32Array(CODE_LENGTH);
+  crypto.getRandomValues(randomValues);
   let code = "";
   for (let i = 0; i < CODE_LENGTH; i++) {
-    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    code += CODE_CHARS[randomValues[i]! % CODE_CHARS.length];
   }
   return code;
 }
