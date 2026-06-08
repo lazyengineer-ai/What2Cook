@@ -76,8 +76,20 @@ export default function RecipeDetailPage() {
 
   return (
     <>
-      <AppHeader title={recipe.title} />
-      <div className="mx-auto max-w-lg space-y-6 p-4 pb-8">
+      <AppHeader
+        title={recipe.title}
+        actions={
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => router.push(`/recipes/${id}/edit`)}
+          >
+            <Pencil className="mr-1.5 h-4 w-4" />
+            Edit
+          </Button>
+        }
+      />
+      <div className="mx-auto max-w-lg space-y-6 p-4 pb-28">
         <div className="relative aspect-video overflow-hidden rounded-xl bg-muted">
           {recipe.photoUrl ? (
             <Image
@@ -171,9 +183,11 @@ export default function RecipeDetailPage() {
           </p>
         )}
 
-        <div className="flex gap-2 pb-4">
+      </div>
+
+      <div className="fixed bottom-20 left-0 right-0 z-40 border-t bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto flex max-w-lg gap-2">
           <Button
-            variant="outline"
             className="flex-1"
             onClick={() => router.push(`/recipes/${id}/edit`)}
           >
