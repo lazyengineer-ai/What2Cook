@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 33% 98%;
+    --foreground: 24 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 24 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 10% 10%;
+    --primary: 32 95% 44%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 140 20% 94%;
+    --secondary-foreground: 140 30% 20%;
+    --muted: 40 20% 94%;
+    --muted-foreground: 24 8% 46%;
+    --accent: 140 25% 90%;
+    --accent-foreground: 140 30% 20%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 40 15% 88%;
+    --input: 40 15% 88%;
+    --ring: 32 95% 44%;
+    --radius: 0.75rem;
+    --sage: 140 25% 45%;
+    --sage-foreground: 0 0% 100%;
+    --amber-brand: 32 95% 44%;
+    --amber-brand-foreground: 0 0% 100%;
+  }
+
+  .dark {
+    --background: 24 10% 8%;
+    --foreground: 40 20% 95%;
+    --card: 24 10% 11%;
+    --card-foreground: 40 20% 95%;
+    --popover: 24 10% 11%;
+    --popover-foreground: 40 20% 95%;
+    --primary: 32 90% 50%;
+    --primary-foreground: 24 10% 8%;
+    --secondary: 140 15% 16%;
+    --secondary-foreground: 140 20% 85%;
+    --muted: 24 8% 16%;
+    --muted-foreground: 40 10% 60%;
+    --accent: 140 15% 18%;
+    --accent-foreground: 140 20% 85%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 24 8% 18%;
+    --input: 24 8% 18%;
+    --ring: 32 90% 50%;
+    --sage: 140 25% 40%;
+    --sage-foreground: 0 0% 100%;
+    --amber-brand: 32 90% 50%;
+    --amber-brand-foreground: 24 10% 8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+}

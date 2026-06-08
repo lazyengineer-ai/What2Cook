@@ -1,0 +1,18 @@
+{
+  "name": "What2Cook",
+  "short_name": "What2Cook",
+  "description": "Household cooking assistant",
+  "start_url": "/home",
+  "display": "standalone",
+  "background_color": "#faf8f5",
+  "theme_color": "#e67e22",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

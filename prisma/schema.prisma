@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users              User[]
+  ingredients        Ingredient[]
+  pantryItems        PantryItem[]
+  recipes            Recipe[]
+  dietaryConstraints DietaryConstraint[]
+  mealPlanEntries    MealPlanEntry[]
+  groceryLists       GroceryList[]
+  purchaseRecords    PurchaseRecord[]
+  usageLogs          UsageLog[]
+  recurringStaples   RecurringStaple[]
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String?
+  email        String    @unique
+  passwordHash String
+  householdId  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  accounts  Account[]
+  sessions  Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model IngredientCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  icon      String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  ingredients Ingredient[]
+}
+
+model Ingredient {
+  id           String   @id @default(cuid())
+  name         String
+  defaultUnit  String   @default("pieces")
+  categoryId   String
+  householdId  String?
+  photoUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category         IngredientCategory @relation(fields: [categoryId], references: [id])
+  household        Household?         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  pantryItems      PantryItem[]
+  recipeIngredients RecipeIngredient[]
+  groceryListItems GroceryListItem[]
+  purchaseLineItems PurchaseLineItem[]
+  usageLogs        UsageLog[]
+  recurringStaples RecurringStaple[]
+
+  @@unique([name, householdId])
+  @@index([name])
+}
+
+model PantryItem {
+  id           String    @id @default(cuid())
+  householdId  String
+  ingredientId String
+  quantity     Float     @default(0)
+  unit         String    @default("pieces")
+  expiryDate   DateTime?
+  photoUrl     String?
+  lowStockThreshold Float?
+  lastUpdated  DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+
+  household  Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, ingredientId])
+}
+
+model Recipe {
+  id           String   @id @default(cuid())
+  householdId  String
+  title        String
+  instructions String   @db.Text
+  prepTime     Int?
+  servings     Int      @default(4)
+  photoUrl     String?
+  tags         String[] @default([])
+  isFavorite   Boolean  @default(false)
+  lastCookedAt DateTime?
+  cookCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  household         Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  recipeIngredients RecipeIngredient[]
+  mealPlanEntries   MealPlanEntry[]
+  usageLogs         UsageLog[]
+}
+
+model RecipeIngredient {
+  id           String  @id @default(cuid())
+  recipeId     String
+  ingredientId String
+  quantity     Float
+  unit         String
+  isOptional   Boolean @default(false)
+
+  recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id])
+
+  @@unique([recipeId, ingredientId])
+}
+
+enum DietaryRule {
+  VEGETARIAN
+  VEGAN
+  NO_SEAFOOD
+  NO_MEAT
+  GLUTEN_FREE
+  DAIRY_FREE
+}
+
+model DietaryConstraint {
+  id          String      @id @default(cuid())
+  householdId String
+  dayOfWeek   Int
+  rule        DietaryRule
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, dayOfWeek, rule])
+}
+
+enum MealSlot {
+  BREAKFAST
+  LUNCH
+  DINNER
+}
+
+model MealPlanEntry {
+  id          String   @id @default(cuid())
+  householdId String
+  date        DateTime @db.Date
+  mealSlot    MealSlot
+  recipeId    String
+  createdAt   DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  recipe    Recipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, date, mealSlot])
+}
+
+enum GroceryListStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+}
+
+enum GroceryItemSource {
+  MANUAL
+  AUTO_GENERATED
+  RECURRING
+}
+
+model GroceryList {
+  id           String            @id @default(cuid())
+  householdId  String
+  weekStartDate DateTime         @db.Date
+  status       GroceryListStatus @default(DRAFT)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  household Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items     GroceryListItem[]
+}
+
+model GroceryListItem {
+  id            String            @id @default(cuid())
+  groceryListId String
+  ingredientId  String
+  quantity      Float
+  unit          String
+  checked       Boolean           @default(false)
+  source        GroceryItemSource @default(MANUAL)
+  createdAt     DateTime          @default(now())
+
+  groceryList GroceryList @relation(fields: [groceryListId], references: [id], onDelete: Cascade)
+  ingredient  Ingredient  @relation(fields: [ingredientId], references: [id])
+
+  @@unique([groceryListId, ingredientId])
+}
+
+model RecurringStaple {
+  id           String  @id @default(cuid())
+  householdId  String
+  ingredientId String
+  quantity     Float
+  unit         String
+
+  household  Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, ingredientId])
+}
+
+model PurchaseRecord {
+  id          String   @id @default(cuid())
+  householdId String
+  store       String?
+  date        DateTime @default(now())
+  total       Float
+  receiptUrl  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  household Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  lineItems PurchaseLineItem[]
+}
+
+model PurchaseLineItem {
+  id               String @id @default(cuid())
+  purchaseRecordId String
+  ingredientId     String?
+  description      String
+  amount           Float
+  quantity         Float?
+  unit             String?
+
+  purchaseRecord PurchaseRecord @relation(fields: [purchaseRecordId], references: [id], onDelete: Cascade)
+  ingredient     Ingredient?    @relation(fields: [ingredientId], references: [id])
+}
+
+model UsageLog {
+  id           String   @id @default(cuid())
+  householdId  String
+  ingredientId String
+  recipeId     String?
+  quantity     Float
+  unit         String
+  loggedAt     DateTime @default(now())
+
+  household  Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id])
+  recipe     Recipe?    @relation(fields: [recipeId], references: [id])
+
+  @@index([householdId, ingredientId, loggedAt])
+}
