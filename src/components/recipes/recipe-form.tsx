@@ -84,20 +84,38 @@ export function RecipeForm({ mode, recipeId, initialData }: RecipeFormProps) {
   }
 
   async function save() {
-    if (!title || !instructions || ingredients.length === 0) {
-      setError("Title, instructions, and at least one ingredient are required");
+    if (!title.trim() || !instructions.trim()) {
+      setError("Title and instructions are required");
       return;
     }
+    if (ingredients.length === 0) {
+      setError("Add at least one ingredient");
+      return;
+    }
+    if (mode === "edit" && !recipeId) {
+      setError("Recipe ID missing — go back and try again");
+      return;
+    }
+
+    const invalidIngredient = ingredients.find((i) => !i.quantity || i.quantity <= 0);
+    if (invalidIngredient) {
+      setError(`Set a quantity greater than 0 for ${invalidIngredient.name}`);
+      return;
+    }
+
     setSaving(true);
     setError("");
 
+    const parsedServings = parseInt(servings, 10);
+    const parsedPrepTime = prepTime.trim() === "" ? null : parseInt(prepTime, 10);
+
     const payload = {
-      title,
-      instructions,
-      prepTime: prepTime ? parseInt(prepTime) : null,
-      servings: parseInt(servings),
+      title: title.trim(),
+      instructions: instructions.trim(),
+      prepTime: parsedPrepTime != null && !Number.isNaN(parsedPrepTime) ? parsedPrepTime : null,
+      servings: Number.isNaN(parsedServings) || parsedServings < 1 ? 4 : parsedServings,
       photoUrl: photoUrl || null,
-      tags: [],
+      tags: [] as string[],
       ingredients: ingredients.map((i) => ({
         ingredientId: i.ingredientId,
         quantity: i.quantity,
@@ -135,7 +153,7 @@ export function RecipeForm({ mode, recipeId, initialData }: RecipeFormProps) {
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 p-4 pb-8">
+    <div className="mx-auto max-w-lg space-y-6 p-4 pb-28">
       <div className="space-y-4">
         <div className="space-y-2">
           <Label>Recipe photo</Label>
@@ -248,15 +266,21 @@ export function RecipeForm({ mode, recipeId, initialData }: RecipeFormProps) {
         ))}
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
-      <Button className="w-full" onClick={save} disabled={saving}>
-        {saving
-          ? "Saving..."
-          : mode === "edit"
-            ? "Save changes"
-            : "Save recipe"}
-      </Button>
+      <div className="sticky bottom-20 z-40 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <Button className="w-full" type="button" onClick={save} disabled={saving}>
+          {saving
+            ? "Saving..."
+            : mode === "edit"
+              ? "Save changes"
+              : "Save recipe"}
+        </Button>
+      </div>
     </div>
   );
 }

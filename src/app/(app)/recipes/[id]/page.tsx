@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import Link from "next/link";
 import { Clock, ChefHat, Trash2, Pencil } from "lucide-react";
 import { scoreRecipe, type RecipeWithIngredients } from "@/lib/match-recipes";
 import { formatQuantity } from "@/lib/utils";
 
 export default function RecipeDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const router = useRouter();
   const [recipe, setRecipe] = useState<RecipeWithIngredients | null>(null);
   const [pantry, setPantry] = useState<
@@ -24,9 +24,10 @@ export default function RecipeDetailPage() {
   const [cooking, setCooking] = useState(false);
 
   const load = useCallback(async () => {
+    if (!id) return;
     const [recipeRes, pantryRes] = await Promise.all([
-      fetch(`/api/recipes/${id}`),
-      fetch("/api/pantry"),
+      fetch(`/api/recipes/${id}`, { credentials: "same-origin", cache: "no-store" }),
+      fetch("/api/pantry", { credentials: "same-origin" }),
     ]);
     if (recipeRes.ok) setRecipe(await recipeRes.json());
     setPantry(await pantryRes.json());
@@ -170,12 +171,14 @@ export default function RecipeDetailPage() {
           </p>
         )}
 
-        <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" asChild>
-            <Link href={`/recipes/${id}/edit`}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit recipe
-            </Link>
+        <div className="flex gap-2 pb-4">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => router.push(`/recipes/${id}/edit`)}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit recipe
           </Button>
           <Button variant="destructive" className="flex-1" onClick={handleDelete}>
             <Trash2 className="mr-2 h-4 w-4" />

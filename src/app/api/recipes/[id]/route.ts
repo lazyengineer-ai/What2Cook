@@ -49,10 +49,8 @@ export async function PATCH(
 
   const parsed = recipeSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.errors[0]?.message ?? "Invalid input" },
-      { status: 400 }
-    );
+    const firstError = parsed.error.errors[0]?.message ?? "Invalid input";
+    return NextResponse.json({ error: firstError }, { status: 400 });
   }
 
   const { title, instructions, prepTime, servings, photoUrl, tags, ingredients } =

@@ -29,20 +29,23 @@ export const pantryItemSchema = z.object({
 });
 
 export const recipeIngredientSchema = z.object({
-  ingredientId: z.string(),
-  quantity: z.number().positive(),
-  unit: z.string(),
-  isOptional: z.boolean().default(false),
+  ingredientId: z.string().min(1),
+  quantity: z.coerce.number().positive("Each ingredient needs a quantity greater than 0"),
+  unit: z.string().min(1),
+  isOptional: z.coerce.boolean().default(false),
 });
 
 export const recipeSchema = z.object({
-  title: z.string().min(1),
-  instructions: z.string().min(1),
-  prepTime: z.number().optional().nullable(),
-  servings: z.number().int().positive().default(4),
+  title: z.string().min(1, "Title is required"),
+  instructions: z.string().min(1, "Instructions are required"),
+  prepTime: z
+    .union([z.number().int().min(0), z.null()])
+    .optional()
+    .transform((v) => v ?? null),
+  servings: z.coerce.number().int().min(1).default(4),
   photoUrl: z.string().optional().nullable(),
   tags: z.array(z.string()).default([]),
-  ingredients: z.array(recipeIngredientSchema).min(1),
+  ingredients: z.array(recipeIngredientSchema).min(1, "Add at least one ingredient"),
 });
 
 export const dietaryConstraintSchema = z.object({

@@ -26,7 +26,8 @@ interface RecipeApiResponse {
 }
 
 export default function EditRecipePage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const [initialData, setInitialData] = useState<RecipeFormInitialData | null>(
     null
   );
@@ -34,7 +35,15 @@ export default function EditRecipePage() {
   const [notFound, setNotFound] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/recipes/${id}`, { credentials: "same-origin" });
+    if (!id) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+    const res = await fetch(`/api/recipes/${id}`, {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
     if (!res.ok) {
       setNotFound(true);
       setLoading(false);
@@ -47,7 +56,7 @@ export default function EditRecipePage() {
       prepTime: recipe.prepTime,
       servings: recipe.servings,
       photoUrl: recipe.photoUrl,
-      ingredients: recipe.recipeIngredients.map((ri) => ({
+      ingredients: (recipe.recipeIngredients ?? []).map((ri) => ({
         ingredientId: ri.ingredientId,
         name: ri.ingredient.name,
         quantity: ri.quantity,
@@ -86,7 +95,7 @@ export default function EditRecipePage() {
   return (
     <>
       <AppHeader title="Edit Recipe" />
-      <RecipeForm mode="edit" recipeId={id} initialData={initialData} />
+      <RecipeForm key={id} mode="edit" recipeId={id} initialData={initialData} />
     </>
   );
 }
