@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth-utils";
+import { requireUserApi } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 
 export async function GET(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q") ?? "";
   const categoryId = searchParams.get("categoryId");
@@ -29,7 +30,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const body = await req.json();
   const { name, categoryId, defaultUnit, photoUrl } = body;
 

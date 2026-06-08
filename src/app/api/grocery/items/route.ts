@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth-utils";
+import { requireUserApi } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { groceryItemSchema } from "@/lib/validations";
-import { getWeekStart } from "@/lib/utils";
+import { parseDateOnly } from "@/lib/utils";
 
 export async function POST(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const body = await req.json();
   const parsed = groceryItemSchema.safeParse(body);
 
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   }
 
   const { weekStart, ingredientId, quantity, unit } = parsed.data;
-  const weekStartDate = weekStart ? new Date(weekStart) : getWeekStart();
+  const weekStartDate = parseDateOnly(weekStart);
 
   const ingredient = await prisma.ingredient.findFirst({
     where: {

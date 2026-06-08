@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth-utils";
+import { requireUserApi } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import OpenAI from "openai";
 import { scoreAllRecipes } from "@/lib/match-recipes";
 import { filterRecipesByConstraints } from "@/lib/dietary";
 
 export async function POST(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
 
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 
 export async function getSessionUser() {
   const session = await auth();
@@ -18,6 +19,15 @@ export async function getSessionUser() {
 export async function requireUser() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  return user;
+}
+
+/** Use in API route handlers — returns 401 JSON instead of redirecting. */
+export async function requireUserApi() {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   return user;
 }
 

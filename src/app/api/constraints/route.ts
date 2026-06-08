@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth-utils";
+import { requireUserApi } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { dietaryConstraintSchema } from "@/lib/validations";
 
 export async function GET() {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const constraints = await prisma.dietaryConstraint.findMany({
     where: { householdId: user.householdId },
     orderBy: [{ dayOfWeek: "asc" }, { rule: "asc" }],
@@ -13,7 +14,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const body = await req.json();
   const parsed = dietaryConstraintSchema.safeParse(body);
 
@@ -40,7 +42,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
 

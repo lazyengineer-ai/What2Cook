@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth-utils";
+import { requireUserApi } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { generateGroceryNeeds, groupByCategory } from "@/lib/grocery-generator";
-import { getWeekStart, addDays } from "@/lib/utils";
+import { getWeekStart, addDays, parseDateOnly } from "@/lib/utils";
 
 export async function GET(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const { searchParams } = new URL(req.url);
   const weekStartParam = searchParams.get("weekStart");
 
   const weekStart = weekStartParam
-    ? new Date(weekStartParam)
+    ? parseDateOnly(weekStartParam)
     : getWeekStart();
 
   const list = await prisma.groceryList.findFirst({
@@ -26,14 +27,15 @@ export async function GET(req: Request) {
     },
   });
 
-  return NextResponse.json(list);
+  return NextResponse.json(list ?? { items: [] });
 }
 
 export async function POST(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const body = await req.json();
   const weekStart = body.weekStart
-    ? new Date(body.weekStart)
+    ? parseDateOnly(body.weekStart)
     : getWeekStart();
   const weekEnd = addDays(weekStart, 6);
 
@@ -144,7 +146,8 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const body = await req.json();
   const { itemId, checked, quantity, unit } = body;
 

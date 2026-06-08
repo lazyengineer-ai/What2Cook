@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth-utils";
+import { requireUserApi } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { mealPlanSchema } from "@/lib/validations";
 import { recipeViolatesConstraint } from "@/lib/dietary";
-import { getWeekStart, addDays } from "@/lib/utils";
+import { getWeekStart, addDays, parseDateOnly } from "@/lib/utils";
 
 export async function GET(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const { searchParams } = new URL(req.url);
   const weekStartParam = searchParams.get("weekStart");
 
   const weekStart = weekStartParam
-    ? new Date(weekStartParam)
+    ? parseDateOnly(weekStartParam)
     : getWeekStart();
 
   const weekEnd = addDays(weekStart, 6);
@@ -37,7 +38,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const body = await req.json();
   const parsed = mealPlanSchema.safeParse(body);
 
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
   }
 
   const { date, mealSlot, recipeId } = parsed.data;
-  const planDate = new Date(date);
+  const planDate = parseDateOnly(date);
   const dayOfWeek = planDate.getDay();
 
   const [recipe, constraints] = await Promise.all([
@@ -94,7 +96,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
 

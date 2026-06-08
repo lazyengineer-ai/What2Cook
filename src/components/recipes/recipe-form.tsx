@@ -112,13 +112,20 @@ export function RecipeForm({ mode, recipeId, initialData }: RecipeFormProps) {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify(payload),
     });
 
     setSaving(false);
     if (!res.ok) {
-      const data = await res.json();
-      setError(data.error ?? "Failed to save");
+      let message = "Failed to save";
+      try {
+        const data = await res.json();
+        message = data.error ?? message;
+      } catch {
+        if (res.status === 401) message = "Please sign in again";
+      }
+      setError(message);
       return;
     }
 

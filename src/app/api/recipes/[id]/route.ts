@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth-utils";
+import { requireUserApi } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { recipeSchema } from "@/lib/validations";
 
@@ -7,7 +7,8 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const { id } = await params;
 
   const recipe = await prisma.recipe.findFirst({
@@ -27,7 +28,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const { id } = await params;
   const body = await req.json();
 
@@ -37,7 +39,7 @@ export async function PATCH(
 
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (body.isFavorite !== undefined) {
+  if (body.isFavorite !== undefined && Object.keys(body).length === 1) {
     const recipe = await prisma.recipe.update({
       where: { id },
       data: { isFavorite: body.isFavorite },
@@ -47,7 +49,10 @@ export async function PATCH(
 
   const parsed = recipeSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.errors[0]?.message ?? "Invalid input" },
+      { status: 400 }
+    );
   }
 
   const { title, instructions, prepTime, servings, photoUrl, tags, ingredients } =
@@ -88,7 +93,8 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await requireUser();
+  const user = await requireUserApi();
+  if (user instanceof NextResponse) return user;
   const { id } = await params;
 
   const existing = await prisma.recipe.findFirst({

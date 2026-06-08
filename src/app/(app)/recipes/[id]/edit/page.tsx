@@ -34,7 +34,7 @@ export default function EditRecipePage() {
   const [notFound, setNotFound] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/recipes/${id}`);
+    const res = await fetch(`/api/recipes/${id}`, { credentials: "same-origin" });
     if (!res.ok) {
       setNotFound(true);
       setLoading(false);

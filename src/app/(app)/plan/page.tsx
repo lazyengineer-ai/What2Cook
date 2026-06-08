@@ -75,7 +75,7 @@ export default function PlanPage() {
     setEntries(planData.entries ?? []);
     const allRecipes = await recipesRes.json();
     setRecipes(allRecipes.map((r: Recipe) => ({ id: r.id, title: r.title })));
-    const groceryData = await groceryRes.json();
+    const groceryData = groceryRes.ok ? await groceryRes.json() : null;
     setGroceryItems(groceryData?.items ?? []);
     setLoading(false);
   }, [weekStartStr]);
@@ -122,8 +122,11 @@ export default function PlanPage() {
   }
 
   async function deleteGroceryItem(itemId: string) {
-    await fetch(`/api/grocery/items/${itemId}`, { method: "DELETE" });
-    load();
+    const res = await fetch(`/api/grocery/items/${itemId}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (res.ok) load();
   }
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));

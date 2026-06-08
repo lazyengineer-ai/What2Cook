@@ -50,6 +50,7 @@ export function AddGroceryItemDialog({
     const res = await fetch("/api/grocery/items", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify({
         weekStart,
         ingredientId: selectedIngredient.id,
@@ -61,10 +62,18 @@ export function AddGroceryItemDialog({
     setSaving(false);
 
     if (!res.ok) {
-      const data = await res.json();
-      setError(data.error ?? "Failed to add item");
+      let message = "Failed to add item";
+      try {
+        const data = await res.json();
+        message = data.error ?? message;
+      } catch {
+        if (res.status === 401) message = "Please sign in again";
+      }
+      setError(message);
       return;
     }
+
+    setError("");
 
     setOpen(false);
     setSelectedIngredient(null);
@@ -90,9 +99,11 @@ export function AddGroceryItemDialog({
             onSelect={(ing) => {
               setSelectedIngredient(ing);
               setUnit(ing.defaultUnit);
+              setError("");
             }}
             placeholder="Search ingredients..."
           />
+          {error && <p className="text-sm text-destructive">{error}</p>}
           {selectedIngredient && (
             <>
               <p className="text-sm font-medium">Selected: {selectedIngredient.name}</p>
@@ -123,7 +134,6 @@ export function AddGroceryItemDialog({
                   </Select>
                 </div>
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
               <Button
                 className="w-full"
                 onClick={handleAdd}
