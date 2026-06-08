@@ -2,7 +2,7 @@ import type { PantryItem, Recipe, RecipeIngredient, Ingredient } from "@prisma/c
 
 export type RecipeWithIngredients = Recipe & {
   recipeIngredients: (RecipeIngredient & {
-    ingredient: Ingredient & { category: { name: string; icon: string | null } };
+    ingredient: Ingredient & { category: { name: string; icon: string | null; slug: string } };
   })[];
 };
 
