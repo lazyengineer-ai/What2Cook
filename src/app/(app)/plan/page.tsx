@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, ShoppingCart, AlertCircle, Trash2, PackagePlus } from "lucide-react";
-import { DAY_NAMES, formatQuantity } from "@/lib/utils";
+import { DAY_NAMES, formatQuantity, formatDateOnly, toDateKey } from "@/lib/utils";
 import { AddGroceryItemDialog } from "@/components/plan/add-grocery-item-dialog";
 import { CategoryFilter } from "@/components/pantry/category-filter";
 import { Badge } from "@/components/ui/badge";
@@ -79,14 +79,14 @@ export default function PlanPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const [planRes, recipesRes, groceryRes, catRes] = await Promise.all([
-      fetch(`/api/meal-plan?weekStart=${weekStartStr}`),
-      fetch("/api/recipes"),
-      fetch(`/api/grocery?weekStart=${weekStartStr}`),
-      fetch("/api/categories"),
+      fetch(`/api/meal-plan?weekStart=${weekStartStr}`, { credentials: "same-origin" }),
+      fetch("/api/recipes", { credentials: "same-origin" }),
+      fetch(`/api/grocery?weekStart=${weekStartStr}`, { credentials: "same-origin" }),
+      fetch("/api/categories", { credentials: "same-origin" }),
     ]);
-    const planData = await planRes.json();
+    const planData = planRes.ok ? await planRes.json() : { entries: [] };
     setEntries(planData.entries ?? []);
-    const allRecipes = await recipesRes.json();
+    const allRecipes = recipesRes.ok ? await recipesRes.json() : [];
     setRecipes(allRecipes.map((r: Recipe) => ({ id: r.id, title: r.title })));
     const groceryData = groceryRes.ok ? await groceryRes.json() : null;
     setGroceryItems(groceryData?.items ?? []);
@@ -102,17 +102,32 @@ export default function PlanPage() {
     const res = await fetch("/api/meal-plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify({
-        date: format(date, "yyyy-MM-dd"),
+        date: formatDateOnly(date),
         mealSlot,
         recipeId,
       }),
     });
     const data = await res.json();
+    if (!res.ok) {
+      setWarnings((w) => [...w, data.error ?? "Failed to assign recipe"]);
+      return;
+    }
     if (data.warning) {
       setWarnings((w) => [...w, data.warning]);
     }
-    load();
+    if (data.entry) {
+      setEntries((prev) => {
+        const dateKey = toDateKey(data.entry.date);
+        const without = prev.filter(
+          (e) => !(toDateKey(e.date) === dateKey && e.mealSlot === data.entry.mealSlot)
+        );
+        return [...without, data.entry];
+      });
+    } else {
+      load();
+    }
   }
 
   async function generateGroceryList() {
@@ -242,7 +257,7 @@ export default function PlanPage() {
               <div className="space-y-4">
                 {days.map((day) => {
                   const dayEntries = entries.filter(
-                    (e) => format(new Date(e.date), "yyyy-MM-dd") === format(day, "yyyy-MM-dd")
+                    (e) => toDateKey(e.date) === formatDateOnly(day)
                   );
                   return (
                     <Card key={day.toISOString()}>
@@ -259,7 +274,7 @@ export default function PlanPage() {
                                   {MEAL_LABELS[slot]}
                                 </span>
                                 <Select
-                                  value={entry?.recipe.id ?? ""}
+                                  value={entry?.recipe.id}
                                   onValueChange={(recipeId) =>
                                     assignMeal(day, slot, recipeId)
                                   }

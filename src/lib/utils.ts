@@ -39,6 +39,15 @@ export function formatDateOnly(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Normalize API date strings or Date objects to yyyy-MM-dd without timezone drift. */
+export function toDateKey(value: Date | string): string {
+  if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    return value.slice(0, 10);
+  }
+  return formatDateOnly(value);
+}
+
 export function addDays(date: Date, days: number): Date {
   const d = new Date(date);
   d.setDate(d.getDate() + days);

@@ -3,7 +3,7 @@ import { requireUserApi } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { mealPlanSchema } from "@/lib/validations";
 import { recipeViolatesConstraint } from "@/lib/dietary";
-import { getWeekStart, addDays, parseDateOnly } from "@/lib/utils";
+import { getWeekStart, addDays, parseDateOnly, formatDateOnly } from "@/lib/utils";
 
 export async function GET(req: Request) {
   const user = await requireUserApi();
@@ -34,7 +34,13 @@ export async function GET(req: Request) {
     orderBy: [{ date: "asc" }, { mealSlot: "asc" }],
   });
 
-  return NextResponse.json({ weekStart, entries });
+  return NextResponse.json({
+    weekStart: formatDateOnly(weekStart),
+    entries: entries.map((entry) => ({
+      ...entry,
+      date: formatDateOnly(entry.date),
+    })),
+  });
 }
 
 export async function POST(req: Request) {
@@ -92,7 +98,16 @@ export async function POST(req: Request) {
     include: { recipe: true },
   });
 
-  return NextResponse.json({ entry, warning: violation }, { status: 201 });
+  return NextResponse.json(
+    {
+      entry: {
+        ...entry,
+        date: formatDateOnly(entry.date),
+      },
+      warning: violation,
+    },
+    { status: 201 }
+  );
 }
 
 export async function DELETE(req: Request) {
