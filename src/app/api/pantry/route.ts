@@ -12,7 +12,11 @@ export async function GET() {
     include: {
       ingredient: { include: { category: true } },
     },
-    orderBy: { ingredient: { name: "asc" } },
+    orderBy: [
+      { ingredient: { name: "asc" } },
+      { expiryDate: { sort: "asc", nulls: "last" } },
+      { createdAt: "asc" },
+    ],
   });
 
   return NextResponse.json(items);
@@ -31,22 +35,8 @@ export async function POST(req: Request) {
   const { ingredientId, quantity, unit, expiryDate, photoUrl, lowStockThreshold } =
     parsed.data;
 
-  const item = await prisma.pantryItem.upsert({
-    where: {
-      householdId_ingredientId: {
-        householdId: user.householdId,
-        ingredientId,
-      },
-    },
-    update: {
-      quantity,
-      unit,
-      expiryDate: expiryDate ? new Date(expiryDate) : null,
-      photoUrl,
-      lowStockThreshold,
-      lastUpdated: new Date(),
-    },
-    create: {
+  const item = await prisma.pantryItem.create({
+    data: {
       householdId: user.householdId,
       ingredientId,
       quantity,
@@ -54,6 +44,7 @@ export async function POST(req: Request) {
       expiryDate: expiryDate ? new Date(expiryDate) : null,
       photoUrl,
       lowStockThreshold,
+      purchasedAt: new Date(),
     },
     include: { ingredient: { include: { category: true } } },
   });

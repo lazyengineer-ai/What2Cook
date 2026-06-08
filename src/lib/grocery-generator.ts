@@ -36,7 +36,10 @@ export function generateGroceryNeeds(
     }
   }
 
-  const pantryMap = new Map(pantry.map((p) => [p.ingredientId, p.quantity]));
+  const pantryMap = new Map<string, number>();
+  for (const p of pantry) {
+    pantryMap.set(p.ingredientId, (pantryMap.get(p.ingredientId) ?? 0) + p.quantity);
+  }
   const toBuy: PlannedNeed[] = [];
 
   for (const need of needsMap.values()) {

@@ -110,21 +110,22 @@ model Ingredient {
 }
 
 model PantryItem {
-  id           String    @id @default(cuid())
-  householdId  String
-  ingredientId String
-  quantity     Float     @default(0)
-  unit         String    @default("pieces")
-  expiryDate   DateTime?
-  photoUrl     String?
+  id                String    @id @default(cuid())
+  householdId       String
+  ingredientId      String
+  quantity          Float     @default(0)
+  unit              String    @default("pieces")
+  expiryDate        DateTime?
+  photoUrl          String?
   lowStockThreshold Float?
-  lastUpdated  DateTime  @default(now())
-  createdAt    DateTime  @default(now())
+  purchasedAt       DateTime?
+  lastUpdated       DateTime  @default(now())
+  createdAt         DateTime  @default(now())
 
   household  Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
   ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
 
-  @@unique([householdId, ingredientId])
+  @@index([householdId, ingredientId])
 }
 
 model Recipe {

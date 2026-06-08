@@ -36,29 +36,56 @@ export async function getUsageForecasts(
     usageByIngredient.set(log.ingredientId, current + log.quantity);
   }
 
-  const forecasts: UsageForecast[] = [];
+  const stockByIngredient = new Map<
+    string,
+    { quantity: number; unit: string; name: string; categoryName: string; lowStockThreshold: number | null }
+  >();
 
   for (const item of pantryItems) {
-    const totalUsed = usageByIngredient.get(item.ingredientId) ?? 0;
+    const existing = stockByIngredient.get(item.ingredientId);
+    if (existing) {
+      existing.quantity += item.quantity;
+      if (
+        item.lowStockThreshold != null &&
+        (existing.lowStockThreshold == null ||
+          item.lowStockThreshold < existing.lowStockThreshold)
+      ) {
+        existing.lowStockThreshold = item.lowStockThreshold;
+      }
+    } else {
+      stockByIngredient.set(item.ingredientId, {
+        quantity: item.quantity,
+        unit: item.unit,
+        name: item.ingredient.name,
+        categoryName: item.ingredient.category.name,
+        lowStockThreshold: item.lowStockThreshold,
+      });
+    }
+  }
+
+  const forecasts: UsageForecast[] = [];
+
+  for (const [ingredientId, stock] of stockByIngredient) {
+    const totalUsed = usageByIngredient.get(ingredientId) ?? 0;
     const avgWeeklyUsage = totalUsed / weeks;
     const weeksRemaining =
-      avgWeeklyUsage > 0 ? item.quantity / avgWeeklyUsage : null;
+      avgWeeklyUsage > 0 ? stock.quantity / avgWeeklyUsage : null;
     const suggestedBuy =
       avgWeeklyUsage > 0
-        ? Math.max(0, Math.ceil((avgWeeklyUsage * 2 - item.quantity) * 100) / 100)
+        ? Math.max(0, Math.ceil((avgWeeklyUsage * 2 - stock.quantity) * 100) / 100)
         : 0;
-    const threshold = item.lowStockThreshold ?? avgWeeklyUsage * 0.5;
+    const threshold = stock.lowStockThreshold ?? avgWeeklyUsage * 0.5;
     const isLowStock =
-      item.quantity <= threshold ||
+      stock.quantity <= threshold ||
       (weeksRemaining !== null && weeksRemaining < 1);
 
     forecasts.push({
-      ingredientId: item.ingredientId,
-      name: item.ingredient.name,
-      unit: item.unit,
-      categoryName: item.ingredient.category.name,
+      ingredientId,
+      name: stock.name,
+      unit: stock.unit,
+      categoryName: stock.categoryName,
       avgWeeklyUsage: Math.round(avgWeeklyUsage * 100) / 100,
-      currentStock: item.quantity,
+      currentStock: stock.quantity,
       weeksRemaining:
         weeksRemaining !== null
           ? Math.round(weeksRemaining * 10) / 10

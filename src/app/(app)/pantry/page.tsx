@@ -24,22 +24,13 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search } from "lucide-react";
-import { UNITS } from "@/lib/utils";
+import { UNITS, formatQuantity } from "@/lib/utils";
 import { isExpiringSoon, isLowStock } from "@/lib/pantry-utils";
-
-interface PantryItem {
-  id: string;
-  quantity: number;
-  unit: string;
-  expiryDate: string | null;
-  photoUrl: string | null;
-  lowStockThreshold?: number | null;
-  ingredient: {
-    id: string;
-    name: string;
-    category: { name: string; icon: string | null; slug: string };
-  };
-}
+import {
+  groupBatchesByIngredient,
+  type IngredientBatchGroup,
+} from "@/lib/pantry-batches";
+import type { PantryItemWithIngredient } from "@/lib/match-recipes";
 
 interface Category {
   id: string;
@@ -49,7 +40,7 @@ interface Category {
 }
 
 export default function PantryPage() {
-  const [items, setItems] = useState<PantryItem[]>([]);
+  const [items, setItems] = useState<PantryItemWithIngredient[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
@@ -79,12 +70,23 @@ export default function PantryPage() {
     load();
   }, [load]);
 
+  const existingBatchesForSelected = useMemo(() => {
+    if (!selectedIngredient) return [];
+    return items.filter((i) => i.ingredientId === selectedIngredient.id);
+  }, [items, selectedIngredient]);
+
+  const existingTotalQty = useMemo(
+    () => existingBatchesForSelected.reduce((sum, i) => sum + i.quantity, 0),
+    [existingBatchesForSelected]
+  );
+
   async function addToPantry() {
     if (!selectedIngredient) return;
     setSaving(true);
     await fetch("/api/pantry", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify({
         ingredientId: selectedIngredient.id,
         quantity: parseFloat(quantity),
@@ -140,20 +142,22 @@ export default function PantryPage() {
     {} as Record<string, number>
   );
 
-  const grouped = filtered.reduce(
-    (acc, item) => {
-      const key = item.ingredient.category.name;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(item);
-      return acc;
-    },
-    {} as Record<string, PantryItem[]>
-  );
+  const groupedByCategory = useMemo(() => {
+    const order = new Map(categories.map((c, i) => [c.name, i]));
+    const ingredientGroups = groupBatchesByIngredient(filtered);
+    const byCategory = new Map<string, IngredientBatchGroup[]>();
 
-  const categoryOrder = new Map(categories.map((c, i) => [c.name, i]));
-  const sortedGroups = Object.entries(grouped).sort(
-    ([a], [b]) => (categoryOrder.get(a) ?? 99) - (categoryOrder.get(b) ?? 99)
-  );
+    for (const group of ingredientGroups) {
+      const key = group.category.name;
+      const list = byCategory.get(key) ?? [];
+      list.push(group);
+      byCategory.set(key, list);
+    }
+
+    return Array.from(byCategory.entries()).sort(
+      ([a], [b]) => (order.get(a) ?? 99) - (order.get(b) ?? 99)
+    );
+  }, [filtered, categories]);
 
   const showGrouped =
     filterCategory === "all" && !searchQuery.trim();
@@ -167,6 +171,33 @@ export default function PantryPage() {
         : filterCategory === "all"
           ? "No items in pantry yet. Add your first ingredient!"
           : `No ${categories.find((c) => c.slug === filterCategory)?.name ?? "items"} in your pantry.`;
+
+  function renderIngredientGroup(group: IngredientBatchGroup, nested: boolean) {
+    const multiBatch = group.batches.length > 1;
+    return (
+      <div key={group.ingredientId} className={nested ? "mb-4" : "mb-2"}>
+        {(nested || multiBatch) && (
+          <h4 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+            {group.name}
+            <span className="text-xs font-normal text-muted-foreground">
+              ({formatQuantity(group.totalQuantity, group.unit)} total
+              {multiBatch ? ` · ${group.batches.length} batches` : ""})
+            </span>
+          </h4>
+        )}
+        <div className={`space-y-2 ${nested && multiBatch ? "ml-2 border-l-2 border-muted pl-3" : ""}`}>
+          {group.batches.map((batch) => (
+            <PantryItemCard
+              key={batch.id}
+              item={batch}
+              onUpdate={load}
+              compact={nested || multiBatch}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -195,6 +226,15 @@ export default function PantryPage() {
                   <p className="text-sm font-medium">
                     Selected: {selectedIngredient.name}
                   </p>
+                  {existingBatchesForSelected.length > 0 && (
+                    <p className="rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
+                      Adds a new batch — your existing{" "}
+                      {formatQuantity(existingTotalQty, existingBatchesForSelected[0]?.unit ?? unit)}{" "}
+                      across {existingBatchesForSelected.length} batch
+                      {existingBatchesForSelected.length === 1 ? "" : "es"} will stay
+                      separate.
+                    </p>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>Quantity</Label>
@@ -235,7 +275,11 @@ export default function PantryPage() {
                     onClick={addToPantry}
                     disabled={saving}
                   >
-                    {saving ? "Adding..." : "Add to pantry"}
+                    {saving
+                      ? "Adding..."
+                      : existingBatchesForSelected.length > 0
+                        ? "Add new batch"
+                        : "Add to pantry"}
                   </Button>
                 </>
               )}
@@ -275,28 +319,30 @@ export default function PantryPage() {
               {emptyMessage}
             </p>
           ) : showGrouped ? (
-            sortedGroups.map(([categoryName, catItems]) => {
-              const icon = catItems[0]?.ingredient.category.icon;
+            groupedByCategory.map(([categoryName, ingredientGroups]) => {
+              const icon = ingredientGroups[0]?.category.icon;
+              const batchCount = ingredientGroups.reduce(
+                (n, g) => n + g.batches.length,
+                0
+              );
               return (
                 <div key={categoryName} className="mb-6">
-                  <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+                  <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
                     <span className="text-base">{icon}</span>
                     {categoryName}
-                    <span className="text-xs font-normal">({catItems.length})</span>
+                    <span className="text-xs font-normal">({batchCount})</span>
                   </h3>
-                  <div className="space-y-2">
-                    {catItems.map((item) => (
-                      <PantryItemCard key={item.id} item={item} onUpdate={load} />
-                    ))}
-                  </div>
+                  {ingredientGroups.map((group) =>
+                    renderIngredientGroup(group, true)
+                  )}
                 </div>
               );
             })
           ) : (
             <div className="space-y-2">
-              {filtered.map((item) => (
-                <PantryItemCard key={item.id} item={item} onUpdate={load} />
-              ))}
+              {groupBatchesByIngredient(filtered).map((group) =>
+                renderIngredientGroup(group, false)
+              )}
             </div>
           )}
         </div>

@@ -37,23 +37,13 @@ export async function POST(req: Request) {
   const added: string[] = [];
 
   for (const item of groceryList.items) {
-    await prisma.pantryItem.upsert({
-      where: {
-        householdId_ingredientId: {
-          householdId: user.householdId,
-          ingredientId: item.ingredientId,
-        },
-      },
-      update: {
-        quantity: { increment: item.quantity },
-        unit: item.unit,
-        lastUpdated: new Date(),
-      },
-      create: {
+    await prisma.pantryItem.create({
+      data: {
         householdId: user.householdId,
         ingredientId: item.ingredientId,
         quantity: item.quantity,
         unit: item.unit,
+        purchasedAt: new Date(),
       },
     });
     added.push(item.ingredient.name);

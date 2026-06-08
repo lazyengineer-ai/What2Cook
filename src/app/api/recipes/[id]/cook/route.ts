@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUserApi } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
+import { sortBatchesFEFO } from "@/lib/pantry-batches";
 
 export async function POST(
   req: Request,
@@ -23,21 +24,31 @@ export async function POST(
     for (const ri of recipe.recipeIngredients) {
       if (ri.isOptional) continue;
 
-      const pantryItem = await tx.pantryItem.findUnique({
+      const batches = await tx.pantryItem.findMany({
         where: {
-          householdId_ingredientId: {
-            householdId: user.householdId,
-            ingredientId: ri.ingredientId,
-          },
+          householdId: user.householdId,
+          ingredientId: ri.ingredientId,
+          quantity: { gt: 0 },
         },
+        include: { ingredient: { include: { category: true } } },
       });
 
-      if (pantryItem) {
-        const newQty = Math.max(0, pantryItem.quantity - ri.quantity);
-        await tx.pantryItem.update({
-          where: { id: pantryItem.id },
-          data: { quantity: newQty, lastUpdated: new Date() },
-        });
+      let remaining = ri.quantity;
+      for (const batch of sortBatchesFEFO(batches)) {
+        if (remaining <= 0) break;
+
+        const deduct = Math.min(batch.quantity, remaining);
+        const newQty = batch.quantity - deduct;
+        remaining -= deduct;
+
+        if (newQty <= 0) {
+          await tx.pantryItem.delete({ where: { id: batch.id } });
+        } else {
+          await tx.pantryItem.update({
+            where: { id: batch.id },
+            data: { quantity: newQty, lastUpdated: new Date() },
+          });
+        }
       }
 
       await tx.usageLog.create({

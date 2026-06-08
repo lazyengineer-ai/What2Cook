@@ -1,4 +1,5 @@
 import type { PantryItem, Recipe, RecipeIngredient, Ingredient } from "@prisma/client";
+import { aggregatePantryByIngredient } from "@/lib/pantry-batches";
 
 export type RecipeWithIngredients = Recipe & {
   recipeIngredients: (RecipeIngredient & {
@@ -32,9 +33,7 @@ export function scoreRecipe(
   recipe: RecipeWithIngredients,
   pantry: PantryItemWithIngredient[]
 ): MatchResult {
-  const pantryMap = new Map(
-    pantry.map((p) => [p.ingredientId, p])
-  );
+  const pantryMap = aggregatePantryByIngredient(pantry, 3);
 
   const required = recipe.recipeIngredients.filter((ri) => !ri.isOptional);
   const totalRequired = required.length || recipe.recipeIngredients.length;
@@ -44,17 +43,12 @@ export function scoreRecipe(
   let availableCount = 0;
   const missingIngredients: MatchResult["missingIngredients"] = [];
   const expiringIngredients: string[] = [];
-  const threeDaysFromNow = new Date();
-  threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
 
   for (const ri of ingredientsToCheck) {
-    const pantryItem = pantryMap.get(ri.ingredientId);
-    if (pantryItem && pantryItem.quantity >= ri.quantity) {
+    const aggregated = pantryMap.get(ri.ingredientId);
+    if (aggregated && aggregated.quantity >= ri.quantity) {
       availableCount++;
-      if (
-        pantryItem.expiryDate &&
-        new Date(pantryItem.expiryDate) <= threeDaysFromNow
-      ) {
+      if (aggregated.hasExpiringBatch) {
         expiringIngredients.push(ri.ingredient.name);
       }
     } else {

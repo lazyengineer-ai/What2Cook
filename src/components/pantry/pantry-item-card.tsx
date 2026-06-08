@@ -31,7 +31,7 @@ interface PantryItemData {
   id: string;
   quantity: number;
   unit: string;
-  expiryDate: string | null;
+  expiryDate: string | Date | null;
   photoUrl: string | null;
   lowStockThreshold?: number | null;
   ingredient: {
@@ -44,14 +44,19 @@ interface PantryItemData {
 interface PantryItemCardProps {
   item: PantryItemData;
   onUpdate: () => void;
+  compact?: boolean;
 }
 
-export function PantryItemCard({ item, onUpdate }: PantryItemCardProps) {
+export function PantryItemCard({ item, onUpdate, compact = false }: PantryItemCardProps) {
   const [editing, setEditing] = useState(false);
   const [quantity, setQuantity] = useState(String(item.quantity));
   const [unit, setUnit] = useState(item.unit);
   const [expiryDate, setExpiryDate] = useState(
-    item.expiryDate ? item.expiryDate.split("T")[0] : ""
+    item.expiryDate
+      ? typeof item.expiryDate === "string"
+        ? item.expiryDate.split("T")[0]
+        : item.expiryDate.toISOString().split("T")[0]
+      : ""
   );
   const [lowStockThreshold, setLowStockThreshold] = useState(
     item.lowStockThreshold != null ? String(item.lowStockThreshold) : ""
@@ -112,7 +117,14 @@ export function PantryItemCard({ item, onUpdate }: PantryItemCardProps) {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium">{item.ingredient.name}</p>
+                {!compact && (
+                  <p className="font-medium">{item.ingredient.name}</p>
+                )}
+                {compact && (
+                  <p className="font-medium">
+                    {formatQuantity(item.quantity, item.unit)}
+                  </p>
+                )}
                 {expiring && (
                   <Badge variant="warning" className="gap-1">
                     <AlertTriangle className="h-3 w-3" />
@@ -126,9 +138,11 @@ export function PantryItemCard({ item, onUpdate }: PantryItemCardProps) {
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">
-                {formatQuantity(item.quantity, item.unit)} · {item.ingredient.category.name}
-              </p>
+              {!compact && (
+                <p className="text-sm text-muted-foreground">
+                  {formatQuantity(item.quantity, item.unit)} · {item.ingredient.category.name}
+                </p>
+              )}
               {item.expiryDate && (
                 <p className="text-xs text-muted-foreground">
                   Expires {format(new Date(item.expiryDate), "MMM d, yyyy")}
