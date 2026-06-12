@@ -1,11 +1,11 @@
 import { AppHeader } from "@/components/layout/app-header";
-import { RecipeForm } from "@/components/recipes/recipe-form";
+import { NewRecipeClient } from "@/components/recipes/new-recipe-client";
 
 export default function NewRecipePage() {
   return (
     <>
       <AppHeader title="New Recipe" />
-      <RecipeForm mode="create" />
+      <NewRecipeClient />
     </>
   );
 }

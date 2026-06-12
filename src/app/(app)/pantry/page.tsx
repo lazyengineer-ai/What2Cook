@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PantryAssistant } from "@/components/ai/pantry-assistant";
 import { Plus, Search } from "lucide-react";
 import { UNITS, formatQuantity } from "@/lib/utils";
 import { isExpiringSoon, isLowStock } from "@/lib/pantry-utils";
@@ -286,6 +287,8 @@ export default function PantryPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <PantryAssistant onApplied={load} />
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

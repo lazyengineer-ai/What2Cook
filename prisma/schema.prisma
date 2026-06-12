@@ -234,6 +234,7 @@ enum GroceryItemSource {
   MANUAL
   AUTO_GENERATED
   RECURRING
+  LOW_STOCK
 }
 
 model GroceryList {
@@ -241,6 +242,7 @@ model GroceryList {
   householdId  String
   weekStartDate DateTime         @db.Date
   status       GroceryListStatus @default(DRAFT)
+  lastGeneratedAt DateTime?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
@@ -318,4 +320,17 @@ model UsageLog {
   recipe     Recipe?    @relation(fields: [recipeId], references: [id])
 
   @@index([householdId, ingredientId, loggedAt])
+}
+
+model AiUsageLog {
+  id                 String   @id @default(cuid())
+  householdId        String
+  feature            String // SUGGEST | RECIPE_DRAFT | PANTRY_TEXT | PANTRY_VOICE | RECEIPT_OCR
+  tokensIn           Int      @default(0)
+  tokensOut          Int      @default(0)
+  estimatedCostCents Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  @@index([householdId, createdAt])
+  @@index([householdId, feature, createdAt])
 }

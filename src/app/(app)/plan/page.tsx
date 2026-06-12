@@ -37,6 +37,7 @@ interface MealEntry {
   id: string;
   date: string;
   mealSlot: string;
+  createdAt?: string;
   recipe: Recipe;
 }
 
@@ -73,6 +74,10 @@ export default function PlanPage() {
   const [generating, setGenerating] = useState(false);
   const [addingToPantry, setAddingToPantry] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [groceryLastGeneratedAt, setGroceryLastGeneratedAt] = useState<string | null>(
+    null
+  );
+  const [showRegeneratePrompt, setShowRegeneratePrompt] = useState(false);
 
   const weekStartStr = format(weekStart, "yyyy-MM-dd");
 
@@ -90,6 +95,7 @@ export default function PlanPage() {
     setRecipes(allRecipes.map((r: Recipe) => ({ id: r.id, title: r.title })));
     const groceryData = groceryRes.ok ? await groceryRes.json() : null;
     setGroceryItems(groceryData?.items ?? []);
+    setGroceryLastGeneratedAt(groceryData?.lastGeneratedAt ?? null);
     setCategories(await catRes.json());
     setLoading(false);
   }, [weekStartStr]);
@@ -125,6 +131,7 @@ export default function PlanPage() {
         );
         return [...without, data.entry];
       });
+      setShowRegeneratePrompt(true);
     } else {
       load();
     }
@@ -138,6 +145,7 @@ export default function PlanPage() {
       body: JSON.stringify({ weekStart: weekStartStr }),
     });
     setGenerating(false);
+    setShowRegeneratePrompt(false);
     load();
   }
 
@@ -205,6 +213,14 @@ export default function PlanPage() {
 
   const showGroceryGrouped = groceryFilter === "all";
 
+  const groceryStale =
+    Boolean(groceryLastGeneratedAt) &&
+    entries.some(
+      (e) =>
+        e.createdAt &&
+        new Date(e.createdAt) > new Date(groceryLastGeneratedAt!)
+    );
+
   return (
     <>
       <AppHeader title="Meal Plan" />
@@ -212,7 +228,15 @@ export default function PlanPage() {
         <Tabs defaultValue="planner">
           <TabsList>
             <TabsTrigger value="planner">Planner</TabsTrigger>
-            <TabsTrigger value="grocery">Grocery List</TabsTrigger>
+            <TabsTrigger value="grocery" className="relative">
+              Grocery List
+              {groceryStale && (
+                <span
+                  className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-500"
+                  aria-label="Grocery list may be out of date"
+                />
+              )}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="planner" className="space-y-4">
@@ -246,6 +270,28 @@ export default function PlanPage() {
                         {w}
                       </p>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {showRegeneratePrompt && (
+              <Card className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
+                <CardContent className="flex items-center justify-between gap-3 p-3">
+                  <p className="text-sm text-blue-900 dark:text-blue-200">
+                    Meal plan changed — update grocery list?
+                  </p>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowRegeneratePrompt(false)}
+                    >
+                      Dismiss
+                    </Button>
+                    <Button size="sm" onClick={generateGroceryList} disabled={generating}>
+                      {generating ? "Updating..." : "Update list"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -412,6 +458,11 @@ function GroceryListRow({
           {item.source === "MANUAL" && (
             <Badge variant="outline" className="text-xs">
               Manual
+            </Badge>
+          )}
+          {item.source === "LOW_STOCK" && (
+            <Badge variant="secondary" className="text-xs">
+              Low stock
             </Badge>
           )}
         </div>
